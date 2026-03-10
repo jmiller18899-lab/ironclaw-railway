@@ -163,35 +163,12 @@ if [ -f "$HOMEBREW_PACKAGES_FILE" ]; then
     done < "$HOMEBREW_PACKAGES_FILE"
 fi
 
-# ─── Composio MCP (optional) ─────────────────────────────────────
+# ─── Composio (native built-in tool) ─────────────────────────────
 
-provision_composio() {
-    if [ -z "$COMPOSIO_API_KEY" ]; then
-        return
+check_composio() {
+    if [ -n "$COMPOSIO_API_KEY" ]; then
+        echo "Composio integration enabled (native tool, entity: ${COMPOSIO_ENTITY_ID:-default})"
     fi
-
-    echo "Provisioning Composio MCP server..."
-
-    # Install the composio MCP bridge if not present
-    if ! command -v composio-mcp >/dev/null 2>&1 && ! npm list -g @composio/mcp &>/dev/null; then
-        echo "  Installing @composio/mcp..."
-        npm install -g @composio/mcp
-    fi
-
-    # Register Composio as an MCP server in IronClaw (stdio transport via npx bridge)
-    # This survives restarts because ironclaw stores MCP config in persistent /data/.ironclaw/
-    local MCP_CONFIG_DIR="/data/.ironclaw/mcp"
-    mkdir -p "$MCP_CONFIG_DIR"
-
-    # Only register if not already configured
-    if ! ironclaw mcp list 2>/dev/null | grep -q composio; then
-        echo "  Registering Composio MCP with IronClaw..."
-        ironclaw mcp add composio --transport stdio --command "npx" --args "@composio/mcp" 2>/dev/null || {
-            echo "  WARNING: Could not register Composio MCP via CLI. Will be available for manual setup."
-        }
-    fi
-
-    echo "  Composio MCP provisioned (API key set via COMPOSIO_API_KEY env var)"
 }
 
 # ─── Mode Selection ──────────────────────────────────────────────
@@ -203,7 +180,7 @@ if [ "$CLAWLAUNCHER_MODE" = "managed" ]; then
     generate_managed_config
 
     # Provision optional integrations
-    provision_composio
+    check_composio
 
     # Start ironclaw (does not return)
     start_managed
@@ -218,7 +195,7 @@ else
         echo "2. Run: ironclaw onboard"
         echo ""
         echo "   Or manually create /data/.ironclaw/.env with:"
-        echo "   DATABASE_URL=postgres://..."
+        echo "   DATABASE_BACKEND=libsql"
         echo "   LLM_BACKEND=openai"
         echo "   LLM_API_KEY=sk-..."
         echo "   GATEWAY_ENABLED=true"
@@ -239,7 +216,7 @@ else
     fi
 
     # Provision optional integrations
-    provision_composio
+    check_composio
 
     echo "Starting IronClaw..."
     exec ironclaw

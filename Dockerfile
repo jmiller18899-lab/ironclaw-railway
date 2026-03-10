@@ -39,12 +39,12 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
-# Download pre-built IronClaw binary from official releases
-ARG IRONCLAW_VERSION="v0.16.1"
+# Download pre-built IronClaw binary from 1clawx fork (includes Composio integration)
+ARG IRONCLAW_VERSION="v0.16.2"
 ARG TARGETARCH
 RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64") && \
-    echo "Installing ironclaw ${IRONCLAW_VERSION}" && \
-    curl -fsSL --retry 3 --retry-delay 5 "https://github.com/nearai/ironclaw/releases/download/${IRONCLAW_VERSION}/ironclaw-${ARCH}-unknown-linux-gnu.tar.gz" \
+    echo "Installing ironclaw ${IRONCLAW_VERSION} from 1clawx fork" && \
+    curl -fsSL --retry 3 --retry-delay 5 "https://github.com/1clawx/ironclaw/releases/download/${IRONCLAW_VERSION}/ironclaw-${ARCH}-unknown-linux-gnu.tar.gz" \
     | tar -xz -C /usr/local/bin ironclaw \
     && chmod +x /usr/local/bin/ironclaw
 
