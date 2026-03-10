@@ -4,7 +4,7 @@ IronClaw is a high-performance AI agent runtime written in Rust by NEAR AI. It f
 
 ## About Hosting IronClaw
 
-Deploying IronClaw on Railway involves downloading the pre-built binary, connecting to a PostgreSQL database (Railway addon), and configuring via environment variables. A persistent volume at `/data` ensures your configuration, skills, and sessions survive redeploys. Once deployed, access the container through Railway's web terminal to run initial setup, then IronClaw auto-starts on subsequent boots. The container exposes port 3000 for the web gateway and webhook integrations.
+Deploying IronClaw on Railway involves downloading the pre-built binary and configuring via environment variables. Uses embedded libSQL (SQLite) by default — no external database needed. A persistent volume at `/data` ensures your configuration, skills, and sessions survive redeploys. Once deployed, access the container through Railway's web terminal to run initial setup, then IronClaw auto-starts on subsequent boots. The container exposes port 8080 for the web gateway and webhook integrations.
 
 ## Common Use Cases
 
@@ -15,9 +15,10 @@ Deploying IronClaw on Railway involves downloading the pre-built binary, connect
 
 ## Dependencies for IronClaw Hosting
 
-- **PostgreSQL 15+**: With pgvector extension (Railway Postgres addon)
 - **LLM Provider API Key**: OpenRouter, OpenAI, Anthropic, or any of 22+ supported providers
 - **Telegram Bot Token** (optional): For Telegram integration, obtained from @BotFather
+- **Composio API Key** (optional): For 1000+ OAuth tool integrations via MCP
+- **PostgreSQL 15+** (optional): Only if you prefer Postgres over embedded libSQL
 
 ### Deployment Dependencies
 
@@ -43,7 +44,7 @@ RUN curl -fsSL "https://github.com/nearai/ironclaw/releases/download/${IRONCLAW_
     | tar -xz -C /usr/local/bin ironclaw
 
 ENV HOME=/data
-EXPOSE 3000
+EXPOSE 8080
 ```
 
 Key implementation notes:

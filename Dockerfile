@@ -108,7 +108,8 @@ ENV SCREEN_HEIGHT=768
 ENV SCREEN_DEPTH=24
 
 # Expose IronClaw gateway port + noVNC web viewer
-EXPOSE 3000 6080
+# Remapped to 8080 to match ZeroClaw template for unified deployment flow
+EXPOSE 8080 6080
 
 WORKDIR /data
 

@@ -80,7 +80,7 @@ render_env() {
 
 generate_managed_config() {
     # Validate required env vars
-    local required_vars="DATABASE_URL LLM_API_KEY LLM_MODEL BOT_TOKEN TELEGRAM_USERNAME"
+    local required_vars="LLM_API_KEY LLM_MODEL BOT_TOKEN TELEGRAM_USERNAME"
     for var in $required_vars; do
         if [ -z "${!var}" ]; then
             echo "ERROR: Required env var $var is not set. Cannot start managed bot."
@@ -163,6 +163,37 @@ if [ -f "$HOMEBREW_PACKAGES_FILE" ]; then
     done < "$HOMEBREW_PACKAGES_FILE"
 fi
 
+# ─── Composio MCP (optional) ─────────────────────────────────────
+
+provision_composio() {
+    if [ -z "$COMPOSIO_API_KEY" ]; then
+        return
+    fi
+
+    echo "Provisioning Composio MCP server..."
+
+    # Install the composio MCP bridge if not present
+    if ! command -v composio-mcp >/dev/null 2>&1 && ! npm list -g @composio/mcp &>/dev/null; then
+        echo "  Installing @composio/mcp..."
+        npm install -g @composio/mcp
+    fi
+
+    # Register Composio as an MCP server in IronClaw (stdio transport via npx bridge)
+    # This survives restarts because ironclaw stores MCP config in persistent /data/.ironclaw/
+    local MCP_CONFIG_DIR="/data/.ironclaw/mcp"
+    mkdir -p "$MCP_CONFIG_DIR"
+
+    # Only register if not already configured
+    if ! ironclaw mcp list 2>/dev/null | grep -q composio; then
+        echo "  Registering Composio MCP with IronClaw..."
+        ironclaw mcp add composio --transport stdio --command "npx" --args "@composio/mcp" 2>/dev/null || {
+            echo "  WARNING: Could not register Composio MCP via CLI. Will be available for manual setup."
+        }
+    fi
+
+    echo "  Composio MCP provisioned (API key set via COMPOSIO_API_KEY env var)"
+}
+
 # ─── Mode Selection ──────────────────────────────────────────────
 
 if [ "$CLAWLAUNCHER_MODE" = "managed" ]; then
@@ -170,6 +201,9 @@ if [ "$CLAWLAUNCHER_MODE" = "managed" ]; then
 
     # Generate config from templates
     generate_managed_config
+
+    # Provision optional integrations
+    provision_composio
 
     # Start ironclaw (does not return)
     start_managed
@@ -189,7 +223,7 @@ else
         echo "   LLM_API_KEY=sk-..."
         echo "   GATEWAY_ENABLED=true"
         echo "   GATEWAY_HOST=0.0.0.0"
-        echo "   GATEWAY_PORT=3000"
+        echo "   GATEWAY_PORT=8080"
         echo ""
         echo "3. Restart the container after configuration"
         echo "=========================================="
@@ -203,6 +237,9 @@ else
 
         echo "Config detected! Starting IronClaw..."
     fi
+
+    # Provision optional integrations
+    provision_composio
 
     echo "Starting IronClaw..."
     exec ironclaw

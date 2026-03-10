@@ -1,6 +1,6 @@
 # IronClaw Railway Template
 
-IronClaw deployed on Railway with persistent storage and PostgreSQL.
+IronClaw deployed on Railway with persistent storage and embedded SQLite (libSQL).
 
 ## Overview
 
@@ -33,10 +33,11 @@ Click the button below to deploy:
 Or manually:
 1. Fork this repo
 2. Create new project in Railway
-3. Add a PostgreSQL addon (enable pgvector extension)
-4. Connect your forked repo
-5. Set environment variables (see below)
-6. Deploy
+3. Connect your forked repo
+4. Set environment variables (see below)
+5. Deploy
+
+No external database needed — uses embedded libSQL (SQLite) by default.
 
 ### 2. Initial Setup (via Railway Terminal)
 
@@ -51,13 +52,13 @@ Or manually create `/data/.ironclaw/.env`:
 
 ```bash
 cat > /data/.ironclaw/.env << 'EOF'
-DATABASE_URL=postgres://...  # From Railway Postgres addon
+DATABASE_BACKEND=libsql
 LLM_BACKEND=openai
 LLM_API_KEY=sk-...
 LLM_MODEL=gpt-4o
 GATEWAY_ENABLED=true
 GATEWAY_HOST=0.0.0.0
-GATEWAY_PORT=3000
+GATEWAY_PORT=8080
 GATEWAY_AUTH_TOKEN=your-secret-token
 CLI_ENABLED=false
 SANDBOX_ENABLED=false
@@ -123,6 +124,7 @@ All data is stored in `/data/` which is mounted as a persistent Railway volume:
 | Path | Contents |
 |------|----------|
 | `/data/.ironclaw/.env` | Main configuration |
+| `/data/.ironclaw/ironclaw.db` | Embedded libSQL database |
 | `/data/.ironclaw/skills/` | Local skills (SKILL.md files) |
 | `/data/.ironclaw/installed_skills/` | ClawHub-installed skills |
 | `/data/.ironclaw/npm-packages.txt` | NPM packages to auto-install |
@@ -167,13 +169,14 @@ Or: `brew install <package-name>`
 |----------|---------|-------------|
 | `HOME` | `/data` | Sets home directory (`~/.ironclaw` = `/data/.ironclaw`) |
 | `IRONCLAW_VERSION` | `v0.16.1` | Release version to install (build arg) |
-| `DATABASE_URL` | — | PostgreSQL connection string (Railway addon) |
+| `DATABASE_BACKEND` | `libsql` | Database backend (`libsql` or `postgres`) |
+| `COMPOSIO_API_KEY` | — | (Optional) Composio API key for MCP integrations |
 | `LLM_BACKEND` | — | LLM provider (openai, anthropic, openrouter, etc.) |
 | `LLM_API_KEY` | — | Provider API key |
 | `LLM_MODEL` | — | Default model identifier |
 | `GATEWAY_ENABLED` | `true` | Enable web gateway |
 | `GATEWAY_HOST` | `0.0.0.0` | Gateway bind address |
-| `GATEWAY_PORT` | `3000` | Gateway port |
+| `GATEWAY_PORT` | `8080` | Gateway port |
 
 See [config.md](config.md) for the full configuration reference.
 
@@ -183,11 +186,10 @@ See [config.md](config.md) for the full configuration reference.
 # Build the image
 docker build -t railway-ironclaw .
 
-# Run locally (needs a Postgres instance)
+# Run locally (no external database needed)
 docker run --rm -it \
-  -p 3000:3000 \
+  -p 8080:8080 \
   -v $(pwd)/.tmpdata:/data \
-  -e DATABASE_URL=postgres://user:pass@host:5432/ironclaw \
   railway-ironclaw
 
 # In another terminal, exec into container
@@ -253,8 +255,13 @@ ironclaw logs
 - Check `HOME` env var is set to `/data`
 
 **Database issues?**
-- Ensure PostgreSQL addon has pgvector enabled
-- Check `DATABASE_URL` is correct
+- Default: embedded libSQL at `/data/.ironclaw/ironclaw.db` (no external DB needed)
+- For Postgres: set `DATABASE_BACKEND=postgres` and `DATABASE_URL=postgres://...`
+
+**Composio not working?**
+- Ensure `COMPOSIO_API_KEY` env var is set
+- Check `ironclaw mcp list` shows composio registered
+- Composio MCP is a hosted service — requires outbound HTTPS to `backend.composio.dev`
 
 **Channel issues?**
 ```bash

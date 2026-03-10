@@ -4,7 +4,9 @@ All configuration is done via environment variables in `~/.ironclaw/.env`. Based
 
 | Variable | Description | In template? | Notes |
 |----------|-------------|:---:|-------|
-| `DATABASE_URL` | PostgreSQL connection string | yes | Requires pgvector extension |
+| `DATABASE_BACKEND` | Database backend | yes | `libsql` (embedded SQLite) or `postgres` |
+| `DATABASE_URL` | PostgreSQL connection string | no | Only needed if `DATABASE_BACKEND=postgres` |
+| `COMPOSIO_API_KEY` | Composio API key | no | Optional — auto-provisions MCP integration |
 | `LLM_BACKEND` | LLM provider (openai, anthropic, nearai, etc.) | yes | 22+ providers supported |
 | `LLM_API_KEY` | Provider API key | yes | |
 | `LLM_MODEL` | Default model identifier | yes | |
@@ -13,7 +15,7 @@ All configuration is done via environment variables in `~/.ironclaw/.env`. Based
 | `CLI_ENABLED` | Enable REPL CLI | yes | `false` for managed |
 | `GATEWAY_ENABLED` | Enable web gateway | yes | `true` |
 | `GATEWAY_HOST` | Gateway bind address | yes | `0.0.0.0` for Railway |
-| `GATEWAY_PORT` | Gateway port | yes | `3000` |
+| `GATEWAY_PORT` | Gateway port | yes | `8080` |
 | `GATEWAY_AUTH_TOKEN` | Bearer token for gateway API | yes | |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token | yes | From @BotFather |
 | `TELEGRAM_ALLOWED_USERS` | Telegram username allowlist | yes | |
