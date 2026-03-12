@@ -90,6 +90,13 @@ generate_managed_config() {
 
     # Render .env from template
     render_env
+
+    # Pre-approve Telegram user (skip pairing flow)
+    local ALLOW_FILE="/data/.ironclaw/telegram-allowFrom.json"
+    if [ ! -f "$ALLOW_FILE" ] && [ -n "$TELEGRAM_USERNAME" ]; then
+        echo "Pre-approving Telegram user: $TELEGRAM_USERNAME"
+        echo "{\"version\":1,\"allowFrom\":[\"$TELEGRAM_USERNAME\"]}" > "$ALLOW_FILE"
+    fi
 }
 
 # ─── Start Managed (ironclaw + sidecars) ─────────────────────────
@@ -104,7 +111,7 @@ start_managed() {
         sleep 1
     fi
     echo "Starting IronClaw..."
-    ironclaw &
+    ironclaw --no-onboard &
     IRONCLAW_PID=$!
     echo "IronClaw started (PID: $IRONCLAW_PID)"
 
@@ -171,6 +178,23 @@ check_composio() {
     fi
 }
 
+# ─── Built-in integrations (WASM extensions) ─────────────────────
+
+install_default_extensions() {
+    local TOOLS_DIR="/data/.ironclaw/tools"
+    # Skip if tools already installed (persistent volume survives redeploys)
+    if [ -d "$TOOLS_DIR" ] && ls "$TOOLS_DIR"/*.wasm 1>/dev/null 2>&1; then
+        local count=$(ls "$TOOLS_DIR"/*.wasm 2>/dev/null | wc -l | tr -d ' ')
+        echo "Built-in extensions already installed ($count tools in $TOOLS_DIR)"
+        return 0
+    fi
+
+    echo "Installing default extensions (gmail, google-calendar, github, ...)..."
+    ironclaw registry install-defaults --force 2>&1 || {
+        echo "Warning: some extensions failed to install (non-fatal)"
+    }
+}
+
 # ─── Mode Selection ──────────────────────────────────────────────
 
 if [ "$CLAWLAUNCHER_MODE" = "managed" ]; then
@@ -178,6 +202,9 @@ if [ "$CLAWLAUNCHER_MODE" = "managed" ]; then
 
     # Generate config from templates
     generate_managed_config
+
+    # Install built-in integrations (WASM tools)
+    install_default_extensions
 
     # Provision optional integrations
     check_composio
