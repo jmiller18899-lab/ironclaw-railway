@@ -189,7 +189,7 @@ install_default_extensions() {
         return 0
     fi
 
-    echo "Installing default extensions (gmail, google-calendar, github, ...)..."
+    echo "Installing default extensions (github, gmail, google-calendar, google-docs, google-drive, google-sheets, google-slides, web-search, ...)..."
     ironclaw registry install-defaults --force 2>&1 || {
         echo "Warning: some extensions failed to install (non-fatal)"
     }
