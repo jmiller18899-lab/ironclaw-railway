@@ -45,7 +45,7 @@ ARG TARGETARCH
 RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64") && \
     echo "Installing ironclaw ${IRONCLAW_VERSION} from 1clawx fork" && \
     curl -fsSL --retry 3 --retry-delay 5 "https://github.com/1clawx/ironclaw/releases/download/${IRONCLAW_VERSION}/ironclaw-${ARCH}-unknown-linux-gnu.tar.gz" \
-    | tar -xz -C /usr/local/bin ironclaw \
+    | tar -xz --strip-components=1 -C /usr/local/bin "ironclaw-${ARCH}-unknown-linux-gnu/ironclaw" \
     && chmod +x /usr/local/bin/ironclaw
 
 # Disable Claude Code auto-updater (installed conditionally at boot via start.sh)
@@ -115,3 +115,4 @@ WORKDIR /data
 
 # No CMD — Railway's startCommand in railway.toml handles this.
 # Having both CMD and startCommand can cause double execution.
+
