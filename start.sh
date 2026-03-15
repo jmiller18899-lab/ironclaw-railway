@@ -41,8 +41,7 @@ mkdir -p /data/.ironclaw /data/.ironclaw/logs /data/.npm-global /data/.npm-cache
 npm config set prefix '/data/.npm-global'
 npm config set cache '/data/.npm-cache'
 if [ -x "/data/.linuxbrew/bin/brew" ]; then
-    eval "
-$('/data/.linuxbrew/bin/brew shellenv)"
+    eval "$(/data/.linuxbrew/bin/brew shellenv)"
 else
     echo "Warning: Homebrew not found, continuing without it..."
 fi
