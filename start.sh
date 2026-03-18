@@ -80,6 +80,22 @@ if [ -z "${GATEWAY_AUTH_TOKEN:-}" ]; then
     exit 1
 fi
 
+# ─── Normalize LLM_MODEL to "provider/model" format ─────────────
+# IronClaw requires "provider/model" format. Auto-prefix the provider
+# when LLM_MODEL is a bare model name (no slash).
+RAW_MODEL="${LLM_MODEL:-claude-sonnet-4-20250514}"
+case "$RAW_MODEL" in
+    */*) RESOLVED_MODEL="$RAW_MODEL" ;;  # already has provider/ prefix
+    gemini-*)    RESOLVED_MODEL="gemini/$RAW_MODEL" ;;
+    gpt-*|o1-*|o3-*|o4-*|chatgpt-*) RESOLVED_MODEL="openai/$RAW_MODEL" ;;
+    claude-*)    RESOLVED_MODEL="anthropic/$RAW_MODEL" ;;
+    deepseek-*)  RESOLVED_MODEL="deepseek/$RAW_MODEL" ;;
+    mistral-*|codestral-*|pixtral-*) RESOLVED_MODEL="mistral/$RAW_MODEL" ;;
+    llama-*|meta-llama*) RESOLVED_MODEL="openrouter/meta-llama/$RAW_MODEL" ;;
+    *)           RESOLVED_MODEL="openrouter/$RAW_MODEL" ;;
+esac
+echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL)"
+
 # ─── Write .env from Railway env vars (atomic) ───────────────────
 echo "Writing IronClaw config..."
 TMP_ENV="$(mktemp /tmp/ironclaw-env.XXXXXX)" || TMP_ENV="/tmp/ironclaw-env.$$"
@@ -87,7 +103,7 @@ cat > "$TMP_ENV" <<EOF
 DATABASE_BACKEND=${DATABASE_BACKEND:-libsql}
 LLM_BACKEND=${LLM_BACKEND:-anthropic}
 LLM_API_KEY=${LLM_API_KEY}
-LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-20250514}
+LLM_MODEL=${RESOLVED_MODEL}
 AGENT_NAME=ironclaw
 CLI_ENABLED=false
 GATEWAY_ENABLED=true
