@@ -125,25 +125,37 @@ fi
 echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL, detected provider: $DETECTED_PROVIDER)"
 
 # ─── Map LLM_API_KEY to provider-specific key variable ───────────
-# IronClaw looks for provider-specific env vars (GEMINI_API_KEY,
-# ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.) rather than a single
-# LLM_API_KEY for native backends. Map accordingly.
+# IronClaw's upstream LLM_PROVIDERS.md documents provider-specific env
+# vars (GEMINI_API_KEY, ANTHROPIC_API_KEY, etc.), but some code paths
+# also read the generic LLM_API_KEY. Write BOTH to be safe.
 RESOLVED_BACKEND="${LLM_BACKEND:-$DETECTED_PROVIDER}"
 PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}"
 case "$RESOLVED_BACKEND" in
-    gemini)    PROVIDER_KEY_LINES="GEMINI_API_KEY=${LLM_API_KEY}" ;;
-    anthropic) PROVIDER_KEY_LINES="ANTHROPIC_API_KEY=${LLM_API_KEY}" ;;
-    openai)    PROVIDER_KEY_LINES="OPENAI_API_KEY=${LLM_API_KEY}" ;;
-    mistral)   PROVIDER_KEY_LINES="MISTRAL_API_KEY=${LLM_API_KEY}" ;;
-    deepseek)  PROVIDER_KEY_LINES="DEEPSEEK_API_KEY=${LLM_API_KEY}" ;;
-    groq)      PROVIDER_KEY_LINES="GROQ_API_KEY=${LLM_API_KEY}" ;;
-    cerebras)  PROVIDER_KEY_LINES="CEREBRAS_API_KEY=${LLM_API_KEY}" ;;
-    sambanova) PROVIDER_KEY_LINES="SAMBANOVA_API_KEY=${LLM_API_KEY}" ;;
-    nvidia)    PROVIDER_KEY_LINES="NVIDIA_API_KEY=${LLM_API_KEY}" ;;
-    cloudflare) PROVIDER_KEY_LINES="CLOUDFLARE_API_KEY=${LLM_API_KEY}" ;;
-    minimax)   PROVIDER_KEY_LINES="MINIMAX_API_KEY=${LLM_API_KEY}" ;;
-    nearai)    PROVIDER_KEY_LINES="NEARAI_API_KEY=${LLM_API_KEY}" ;;
-    *)         ;; # openai_compatible, openrouter, etc. use LLM_API_KEY
+    gemini)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+GEMINI_API_KEY=${LLM_API_KEY}" ;;
+    anthropic) PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+ANTHROPIC_API_KEY=${LLM_API_KEY}" ;;
+    openai)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+OPENAI_API_KEY=${LLM_API_KEY}" ;;
+    mistral)   PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+MISTRAL_API_KEY=${LLM_API_KEY}" ;;
+    deepseek)  PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+DEEPSEEK_API_KEY=${LLM_API_KEY}" ;;
+    groq)      PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+GROQ_API_KEY=${LLM_API_KEY}" ;;
+    cerebras)  PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+CEREBRAS_API_KEY=${LLM_API_KEY}" ;;
+    sambanova) PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+SAMBANOVA_API_KEY=${LLM_API_KEY}" ;;
+    nvidia)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+NVIDIA_API_KEY=${LLM_API_KEY}" ;;
+    cloudflare) PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+CLOUDFLARE_API_KEY=${LLM_API_KEY}" ;;
+    minimax)   PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+MINIMAX_API_KEY=${LLM_API_KEY}" ;;
+    nearai)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+NEARAI_API_KEY=${LLM_API_KEY}" ;;
+    *)         ;; # openai_compatible, openrouter, etc. use LLM_API_KEY only
 esac
 echo "Using backend: $RESOLVED_BACKEND (provider key mapped)"
 
