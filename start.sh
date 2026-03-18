@@ -71,6 +71,11 @@ else
 fi
 
 # ─── Validate required env vars ──────────────────────────────────
+# IronClaw uses provider-specific key variables (ANTHROPIC_API_KEY,
+# OPENAI_API_KEY, GEMINI_API_KEY, etc.) but also falls back to
+# LLM_API_KEY for openai_compatible and some providers.
+# We accept LLM_API_KEY as the single Railway variable and map it
+# to the correct provider-specific variable later.
 if [ -z "${LLM_API_KEY:-}" ]; then
     echo "ERROR: LLM_API_KEY is not set in Railway Variables."
     exit 1
@@ -119,13 +124,36 @@ if [ -z "${LLM_BACKEND:-}" ]; then
 fi
 echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL, detected provider: $DETECTED_PROVIDER)"
 
+# ─── Map LLM_API_KEY to provider-specific key variable ───────────
+# IronClaw looks for provider-specific env vars (GEMINI_API_KEY,
+# ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.) rather than a single
+# LLM_API_KEY for native backends. Map accordingly.
+RESOLVED_BACKEND="${LLM_BACKEND:-$DETECTED_PROVIDER}"
+PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}"
+case "$RESOLVED_BACKEND" in
+    gemini)    PROVIDER_KEY_LINES="GEMINI_API_KEY=${LLM_API_KEY}" ;;
+    anthropic) PROVIDER_KEY_LINES="ANTHROPIC_API_KEY=${LLM_API_KEY}" ;;
+    openai)    PROVIDER_KEY_LINES="OPENAI_API_KEY=${LLM_API_KEY}" ;;
+    mistral)   PROVIDER_KEY_LINES="MISTRAL_API_KEY=${LLM_API_KEY}" ;;
+    deepseek)  PROVIDER_KEY_LINES="DEEPSEEK_API_KEY=${LLM_API_KEY}" ;;
+    groq)      PROVIDER_KEY_LINES="GROQ_API_KEY=${LLM_API_KEY}" ;;
+    cerebras)  PROVIDER_KEY_LINES="CEREBRAS_API_KEY=${LLM_API_KEY}" ;;
+    sambanova) PROVIDER_KEY_LINES="SAMBANOVA_API_KEY=${LLM_API_KEY}" ;;
+    nvidia)    PROVIDER_KEY_LINES="NVIDIA_API_KEY=${LLM_API_KEY}" ;;
+    cloudflare) PROVIDER_KEY_LINES="CLOUDFLARE_API_KEY=${LLM_API_KEY}" ;;
+    minimax)   PROVIDER_KEY_LINES="MINIMAX_API_KEY=${LLM_API_KEY}" ;;
+    nearai)    PROVIDER_KEY_LINES="NEARAI_API_KEY=${LLM_API_KEY}" ;;
+    *)         ;; # openai_compatible, openrouter, etc. use LLM_API_KEY
+esac
+echo "Using backend: $RESOLVED_BACKEND (provider key mapped)"
+
 # ─── Write .env from Railway env vars (atomic) ───────────────────
 echo "Writing IronClaw config..."
 TMP_ENV="$(mktemp /tmp/ironclaw-env.XXXXXX)" || TMP_ENV="/tmp/ironclaw-env.$$"
 cat > "$TMP_ENV" <<EOF
 DATABASE_BACKEND=${DATABASE_BACKEND:-libsql}
-LLM_BACKEND=${LLM_BACKEND:-$DETECTED_PROVIDER}
-LLM_API_KEY=${LLM_API_KEY}
+LLM_BACKEND=${RESOLVED_BACKEND}
+${PROVIDER_KEY_LINES}
 LLM_MODEL=${RESOLVED_MODEL}
 AGENT_NAME=ironclaw
 CLI_ENABLED=false
@@ -133,6 +161,7 @@ GATEWAY_ENABLED=true
 GATEWAY_HOST=0.0.0.0
 GATEWAY_PORT=8080
 GATEWAY_AUTH_TOKEN=${GATEWAY_AUTH_TOKEN}
+HTTP_PORT=${HTTP_PORT:-3001}
 SANDBOX_ENABLED=false
 HEARTBEAT_ENABLED=false
 EMBEDDING_ENABLED=false
