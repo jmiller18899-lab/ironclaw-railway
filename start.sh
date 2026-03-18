@@ -86,13 +86,23 @@ fi
 RAW_MODEL="${LLM_MODEL:-claude-sonnet-4-20250514}"
 case "$RAW_MODEL" in
     */*) RESOLVED_MODEL="$RAW_MODEL" ;;  # already has provider/ prefix
-    gemini-*)    RESOLVED_MODEL="gemini/$RAW_MODEL" ;;
-    gpt-*|o1|o1-*|o3|o3-*|o4|o4-*|chatgpt-*) RESOLVED_MODEL="openai/$RAW_MODEL" ;;
-    claude-*)    RESOLVED_MODEL="anthropic/$RAW_MODEL" ;;
-    deepseek-*)  RESOLVED_MODEL="deepseek/$RAW_MODEL" ;;
-    mistral-*|codestral-*|pixtral-*) RESOLVED_MODEL="mistral/$RAW_MODEL" ;;
-    llama-*|meta-llama*) RESOLVED_MODEL="openrouter/meta-llama/$RAW_MODEL" ;;
-    *)           RESOLVED_MODEL="openrouter/$RAW_MODEL" ;;
+    *)
+        if [ -n "${LLM_BACKEND:-}" ]; then
+            # User explicitly set LLM_BACKEND — use it as the provider prefix
+            RESOLVED_MODEL="${LLM_BACKEND}/${RAW_MODEL}"
+        else
+            # Auto-detect provider from model name patterns
+            case "$RAW_MODEL" in
+                gemini-*)    RESOLVED_MODEL="gemini/$RAW_MODEL" ;;
+                gpt-*|o1|o1-*|o3|o3-*|o4|o4-*|chatgpt-*) RESOLVED_MODEL="openai/$RAW_MODEL" ;;
+                claude-*)    RESOLVED_MODEL="anthropic/$RAW_MODEL" ;;
+                deepseek-*)  RESOLVED_MODEL="deepseek/$RAW_MODEL" ;;
+                mistral-*|codestral-*|pixtral-*) RESOLVED_MODEL="mistral/$RAW_MODEL" ;;
+                llama-*|meta-llama*) RESOLVED_MODEL="openrouter/meta-llama/$RAW_MODEL" ;;
+                *)           RESOLVED_MODEL="openrouter/$RAW_MODEL" ;;
+            esac
+        fi
+        ;;
 esac
 # Extract detected provider from resolved model (first path component)
 # Validate it's a known LLM_BACKEND value; fall back to openrouter for
