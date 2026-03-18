@@ -115,7 +115,7 @@ esac
 DETECTED_PROVIDER="${RESOLVED_MODEL%%/*}"
 if [ -z "${LLM_BACKEND:-}" ]; then
     case "$DETECTED_PROVIDER" in
-        openai|anthropic|gemini|openrouter|mistral|deepseek|groq|ollama|together|fireworks|cerebras|sambanova|nvidia|cloudflare|nearai)
+        openai|anthropic|gemini|openrouter|mistral|deepseek|groq|ollama|together|fireworks|cerebras|sambanova|nvidia|cloudflare|minimax|nearai)
             ;; # valid backend, keep it
         *)
             DETECTED_PROVIDER="openrouter"
