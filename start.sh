@@ -94,14 +94,16 @@ case "$RAW_MODEL" in
     llama-*|meta-llama*) RESOLVED_MODEL="openrouter/meta-llama/$RAW_MODEL" ;;
     *)           RESOLVED_MODEL="openrouter/$RAW_MODEL" ;;
 esac
-echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL)"
+# Extract detected provider from resolved model (first path component)
+DETECTED_PROVIDER="${RESOLVED_MODEL%%/*}"
+echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL, detected provider: $DETECTED_PROVIDER)"
 
 # ─── Write .env from Railway env vars (atomic) ───────────────────
 echo "Writing IronClaw config..."
 TMP_ENV="$(mktemp /tmp/ironclaw-env.XXXXXX)" || TMP_ENV="/tmp/ironclaw-env.$$"
 cat > "$TMP_ENV" <<EOF
 DATABASE_BACKEND=${DATABASE_BACKEND:-libsql}
-LLM_BACKEND=${LLM_BACKEND:-anthropic}
+LLM_BACKEND=${LLM_BACKEND:-$DETECTED_PROVIDER}
 LLM_API_KEY=${LLM_API_KEY}
 LLM_MODEL=${RESOLVED_MODEL}
 AGENT_NAME=ironclaw
