@@ -102,7 +102,8 @@ case "$DETECTED_PROVIDER" in
     openai|anthropic|gemini|openrouter|mistral|deepseek|groq|ollama|together|fireworks|cerebras|sambanova|nvidia|cloudflare|nearai)
         ;; # valid backend, keep it
     *)
-        DETECTED_PROVIDER="openrouter" ;;
+        DETECTED_PROVIDER="openrouter"
+        RESOLVED_MODEL="openrouter/$RESOLVED_MODEL" ;;
 esac
 echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL, detected provider: $DETECTED_PROVIDER)"
 
