@@ -87,7 +87,7 @@ RAW_MODEL="${LLM_MODEL:-claude-sonnet-4-20250514}"
 case "$RAW_MODEL" in
     */*) RESOLVED_MODEL="$RAW_MODEL" ;;  # already has provider/ prefix
     gemini-*)    RESOLVED_MODEL="gemini/$RAW_MODEL" ;;
-    gpt-*|o1-*|o3-*|o4-*|chatgpt-*) RESOLVED_MODEL="openai/$RAW_MODEL" ;;
+    gpt-*|o1|o1-*|o3|o3-*|o4|o4-*|chatgpt-*) RESOLVED_MODEL="openai/$RAW_MODEL" ;;
     claude-*)    RESOLVED_MODEL="anthropic/$RAW_MODEL" ;;
     deepseek-*)  RESOLVED_MODEL="deepseek/$RAW_MODEL" ;;
     mistral-*|codestral-*|pixtral-*) RESOLVED_MODEL="mistral/$RAW_MODEL" ;;
