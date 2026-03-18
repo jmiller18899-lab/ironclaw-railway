@@ -65,9 +65,7 @@ else
 fi
 
 if [ -x "/data/.linuxbrew/bin/brew" ]; then
-    eval "
-$(/data/.linuxbrew/bin/brew shellenv)
-" 
+    eval "$(/data/.linuxbrew/bin/brew shellenv)"
 else
     echo "Warning: Homebrew not found, continuing without it..."
 fi
@@ -132,14 +130,19 @@ if ! command -v ironclaw >/dev/null 2>&1; then
     exit 1
 fi
 
+# Disable exit-on-error so the restart loop can catch ironclaw failures
+set +e
+
 while true; do
     ironclaw run --no-onboard
     EXIT_CODE=$?
+    set -e
     FAIL_COUNT=$((FAIL_COUNT + 1))
     echo "IronClaw exited (code $EXIT_CODE, attempt $FAIL_COUNT/$MAX_FAILS). Restarting in ${IRONCLAW_RESTART_DELAY:-5}s..."
     if [ $FAIL_COUNT -ge $MAX_FAILS ]; then
         echo "Too many failures. Exiting."
         exit 1
     fi
+    set +e
     sleep ${IRONCLAW_RESTART_DELAY:-5}
 done
