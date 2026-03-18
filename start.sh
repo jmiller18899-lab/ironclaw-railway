@@ -104,17 +104,19 @@ case "$RAW_MODEL" in
         fi
         ;;
 esac
-# Extract detected provider from resolved model (first path component)
-# Validate it's a known LLM_BACKEND value; fall back to openrouter for
-# org/model style paths (e.g. meta-llama/llama-3.1-70b) that aren't backends.
+# Extract detected provider from resolved model (first path component).
+# When LLM_BACKEND is explicitly set, trust the user's choice; otherwise
+# validate against known backends and fall back to openrouter.
 DETECTED_PROVIDER="${RESOLVED_MODEL%%/*}"
-case "$DETECTED_PROVIDER" in
-    openai|anthropic|gemini|openrouter|mistral|deepseek|groq|ollama|together|fireworks|cerebras|sambanova|nvidia|cloudflare|nearai)
-        ;; # valid backend, keep it
-    *)
-        DETECTED_PROVIDER="openrouter"
-        RESOLVED_MODEL="openrouter/$RESOLVED_MODEL" ;;
-esac
+if [ -z "${LLM_BACKEND:-}" ]; then
+    case "$DETECTED_PROVIDER" in
+        openai|anthropic|gemini|openrouter|mistral|deepseek|groq|ollama|together|fireworks|cerebras|sambanova|nvidia|cloudflare|nearai)
+            ;; # valid backend, keep it
+        *)
+            DETECTED_PROVIDER="openrouter"
+            RESOLVED_MODEL="openrouter/$RESOLVED_MODEL" ;;
+    esac
+fi
 echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL, detected provider: $DETECTED_PROVIDER)"
 
 # ─── Write .env from Railway env vars (atomic) ───────────────────
