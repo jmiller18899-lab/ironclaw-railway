@@ -71,6 +71,11 @@ else
 fi
 
 # ─── Validate required env vars ──────────────────────────────────
+# IronClaw uses provider-specific key variables (ANTHROPIC_API_KEY,
+# OPENAI_API_KEY, GEMINI_API_KEY, etc.) but also falls back to
+# LLM_API_KEY for openai_compatible and some providers.
+# We accept LLM_API_KEY as the single Railway variable and map it
+# to the correct provider-specific variable later.
 if [ -z "${LLM_API_KEY:-}" ]; then
     echo "ERROR: LLM_API_KEY is not set in Railway Variables."
     exit 1
@@ -80,20 +85,95 @@ if [ -z "${GATEWAY_AUTH_TOKEN:-}" ]; then
     exit 1
 fi
 
+# ─── Normalize LLM_MODEL to "provider/model" format ─────────────
+# IronClaw requires "provider/model" format. Auto-prefix the provider
+# when LLM_MODEL is a bare model name (no slash).
+RAW_MODEL="${LLM_MODEL:-claude-sonnet-4-20250514}"
+case "$RAW_MODEL" in
+    */*) RESOLVED_MODEL="$RAW_MODEL" ;;  # already has provider/ prefix
+    *)
+        if [ -n "${LLM_BACKEND:-}" ]; then
+            # User explicitly set LLM_BACKEND — use it as the provider prefix
+            RESOLVED_MODEL="${LLM_BACKEND}/${RAW_MODEL}"
+        else
+            # Auto-detect provider from model name patterns
+            case "$RAW_MODEL" in
+                gemini-*)    RESOLVED_MODEL="gemini/$RAW_MODEL" ;;
+                gpt-*|o1|o1-*|o3|o3-*|o4|o4-*|chatgpt-*) RESOLVED_MODEL="openai/$RAW_MODEL" ;;
+                claude-*)    RESOLVED_MODEL="anthropic/$RAW_MODEL" ;;
+                deepseek-*)  RESOLVED_MODEL="deepseek/$RAW_MODEL" ;;
+                mistral-*|codestral-*|pixtral-*) RESOLVED_MODEL="mistral/$RAW_MODEL" ;;
+                llama-*|meta-llama*) RESOLVED_MODEL="openrouter/meta-llama/$RAW_MODEL" ;;
+                *)           RESOLVED_MODEL="openrouter/$RAW_MODEL" ;;
+            esac
+        fi
+        ;;
+esac
+# Extract detected provider from resolved model (first path component).
+# When LLM_BACKEND is explicitly set, trust the user's choice; otherwise
+# validate against known backends and fall back to openrouter.
+DETECTED_PROVIDER="${RESOLVED_MODEL%%/*}"
+if [ -z "${LLM_BACKEND:-}" ]; then
+    case "$DETECTED_PROVIDER" in
+        openai|anthropic|gemini|openrouter|mistral|deepseek|groq|ollama|together|fireworks|cerebras|sambanova|nvidia|cloudflare|minimax|nearai)
+            ;; # valid backend, keep it
+        *)
+            DETECTED_PROVIDER="openrouter"
+            RESOLVED_MODEL="openrouter/$RESOLVED_MODEL" ;;
+    esac
+fi
+echo "Resolved model: $RESOLVED_MODEL (raw: $RAW_MODEL, detected provider: $DETECTED_PROVIDER)"
+
+# ─── Map LLM_API_KEY to provider-specific key variable ───────────
+# IronClaw's upstream LLM_PROVIDERS.md documents provider-specific env
+# vars (GEMINI_API_KEY, ANTHROPIC_API_KEY, etc.), but some code paths
+# also read the generic LLM_API_KEY. Write BOTH to be safe.
+RESOLVED_BACKEND="${LLM_BACKEND:-$DETECTED_PROVIDER}"
+PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}"
+case "$RESOLVED_BACKEND" in
+    gemini)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+GEMINI_API_KEY=${LLM_API_KEY}" ;;
+    anthropic) PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+ANTHROPIC_API_KEY=${LLM_API_KEY}" ;;
+    openai)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+OPENAI_API_KEY=${LLM_API_KEY}" ;;
+    mistral)   PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+MISTRAL_API_KEY=${LLM_API_KEY}" ;;
+    deepseek)  PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+DEEPSEEK_API_KEY=${LLM_API_KEY}" ;;
+    groq)      PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+GROQ_API_KEY=${LLM_API_KEY}" ;;
+    cerebras)  PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+CEREBRAS_API_KEY=${LLM_API_KEY}" ;;
+    sambanova) PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+SAMBANOVA_API_KEY=${LLM_API_KEY}" ;;
+    nvidia)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+NVIDIA_API_KEY=${LLM_API_KEY}" ;;
+    cloudflare) PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+CLOUDFLARE_API_KEY=${LLM_API_KEY}" ;;
+    minimax)   PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+MINIMAX_API_KEY=${LLM_API_KEY}" ;;
+    nearai)    PROVIDER_KEY_LINES="LLM_API_KEY=${LLM_API_KEY}
+NEARAI_API_KEY=${LLM_API_KEY}" ;;
+    *)         ;; # openai_compatible, openrouter, etc. use LLM_API_KEY only
+esac
+echo "Using backend: $RESOLVED_BACKEND (provider key mapped)"
+
 # ─── Write .env from Railway env vars (atomic) ───────────────────
 echo "Writing IronClaw config..."
 TMP_ENV="$(mktemp /tmp/ironclaw-env.XXXXXX)" || TMP_ENV="/tmp/ironclaw-env.$$"
 cat > "$TMP_ENV" <<EOF
 DATABASE_BACKEND=${DATABASE_BACKEND:-libsql}
-LLM_BACKEND=${LLM_BACKEND:-anthropic}
-LLM_API_KEY=${LLM_API_KEY}
-LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-20250514}
+LLM_BACKEND=${RESOLVED_BACKEND}
+${PROVIDER_KEY_LINES}
+LLM_MODEL=${RESOLVED_MODEL}
 AGENT_NAME=ironclaw
 CLI_ENABLED=false
 GATEWAY_ENABLED=true
 GATEWAY_HOST=0.0.0.0
 GATEWAY_PORT=8080
 GATEWAY_AUTH_TOKEN=${GATEWAY_AUTH_TOKEN}
+HTTP_PORT=${HTTP_PORT:-3001}
 SANDBOX_ENABLED=false
 HEARTBEAT_ENABLED=false
 EMBEDDING_ENABLED=false
