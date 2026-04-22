@@ -23,12 +23,17 @@ WORKDIR /app
 
 # Fetch the source tree. The ADD against the GitHub commits API acts as a
 # cache buster — the layer is invalidated whenever the resolved ref moves.
+# We use `git init && fetch && checkout FETCH_HEAD` instead of
+# `git clone --branch` so IRONCLAW_REF can also be a raw commit SHA
+# (clone --branch only accepts branch or tag names).
 FROM chef AS source
 ARG IRONCLAW_REPO
 ARG IRONCLAW_REF
 ADD "https://api.github.com/repos/${IRONCLAW_REPO}/commits/${IRONCLAW_REF}" /tmp/commit.json
-RUN git clone --depth 1 --branch "${IRONCLAW_REF}" \
-        "https://github.com/${IRONCLAW_REPO}.git" /app \
+RUN git init /app \
+    && git -C /app remote add origin "https://github.com/${IRONCLAW_REPO}.git" \
+    && git -C /app fetch --depth 1 origin "${IRONCLAW_REF}" \
+    && git -C /app checkout FETCH_HEAD \
     && git -C /app log -1 --pretty='ironclaw build ref: %H %s'
 
 # cargo-chef: prepare dependency recipe so we only rebuild deps when
