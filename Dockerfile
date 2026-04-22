@@ -1,5 +1,60 @@
 # syntax=docker/dockerfile:1.7
 
+# ══════════════════════════════════════════════════════════════════
+# Build stage: compile the `ironclaw` binary from a jmiller18899-lab
+# fork so fork-only changes (hermes WASM tool, registry bundle
+# updates, etc.) actually reach the Railway deployment.
+#
+# Override at build time with:
+#   --build-arg IRONCLAW_REPO=owner/repo
+#   --build-arg IRONCLAW_REF=<branch|tag|sha>
+# ══════════════════════════════════════════════════════════════════
+
+ARG IRONCLAW_REPO=jmiller18899-lab/ironclaw
+ARG IRONCLAW_REF=staging
+
+FROM rust:1.92-bookworm AS chef
+RUN rustup target add wasm32-wasip2 \
+    && cargo install cargo-chef@0.1.77 wasm-tools@1.246.1 \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+# Fetch the source tree. The ADD against the GitHub commits API acts as a
+# cache buster — the layer is invalidated whenever the resolved ref moves.
+# We use `git init && fetch && checkout FETCH_HEAD` instead of
+# `git clone --branch` so IRONCLAW_REF can also be a raw commit SHA
+# (clone --branch only accepts branch or tag names).
+FROM chef AS source
+ARG IRONCLAW_REPO
+ARG IRONCLAW_REF
+ADD "https://api.github.com/repos/${IRONCLAW_REPO}/commits/${IRONCLAW_REF}" /tmp/commit.json
+RUN git init /app \
+    && git -C /app remote add origin "https://github.com/${IRONCLAW_REPO}.git" \
+    && git -C /app fetch --depth 1 origin "${IRONCLAW_REF}" \
+    && git -C /app checkout FETCH_HEAD \
+    && git -C /app log -1 --pretty='ironclaw build ref: %H %s'
+
+# cargo-chef: prepare dependency recipe so we only rebuild deps when
+# Cargo.toml/Cargo.lock change.
+FROM chef AS planner
+COPY --from=source /app /app
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS deps
+ENV CARGO_PROFILE_DIST_PANIC=abort \
+    CARGO_PROFILE_DIST_CODEGEN_UNITS=1
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --profile dist --recipe-path recipe.json
+
+FROM deps AS builder
+COPY --from=source /app /app
+RUN cargo build --profile dist --bin ironclaw
+
+# ══════════════════════════════════════════════════════════════════
+# Runtime stage: Railway environment (NullClaw edition + Hermes).
+# ══════════════════════════════════════════════════════════════════
 FROM debian:trixie-slim
 
 # Install runtime tools + common CLI utils
@@ -39,14 +94,13 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
-# Download pre-built IronClaw binary from 1clawx fork (includes Composio integration)
-ARG IRONCLAW_VERSION="v0.16.2"
-ARG TARGETARCH
-RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64") && \
-    echo "Installing ironclaw ${IRONCLAW_VERSION} from 1clawx fork" && \
-    curl -fsSL --retry 3 --retry-delay 5 "https://github.com/1clawx/ironclaw/releases/download/${IRONCLAW_VERSION}/ironclaw-${ARCH}-unknown-linux-gnu.tar.gz" \
-    | tar -xz --strip-components=1 -C /usr/local/bin "ironclaw-${ARCH}-unknown-linux-gnu/ironclaw" \
-    && chmod +x /usr/local/bin/ironclaw
+# Install freshly-built ironclaw binary and runtime assets from the
+# builder stage. Migrations are read from disk at runtime; the registry
+# catalog is embedded into the binary at compile time, so we don't need
+# to copy `registry/` here.
+COPY --from=builder /app/target/dist/ironclaw /usr/local/bin/ironclaw
+COPY --from=builder /app/migrations /app/migrations
+RUN chmod +x /usr/local/bin/ironclaw
 
 # Disable Claude Code auto-updater (installed conditionally at boot via start.sh)
 ENV DISABLE_AUTOUPDATER=1
@@ -115,4 +169,3 @@ WORKDIR /data
 
 # No CMD — Railway's startCommand in railway.toml handles this.
 # Having both CMD and startCommand can cause double execution.
-

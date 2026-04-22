@@ -96,16 +96,39 @@ mv "$TMP_ENV" "$ENV_FILE"
 chmod 600 "$ENV_FILE" || true
 echo ".env written to $ENV_FILE."
 
-# ─── Install default WASM extensions (once) ──────────────────────
+# ─── Install default WASM extensions ─────────────────────────────
+# Reinstalls whenever the ironclaw binary changes so bundled-registry
+# updates (new tools, renamed manifests, WIT bumps) actually take effect
+# after a redeploy. The previous behaviour skipped forever on first
+# success, which silently kept stale/broken WASM around across binary
+# upgrades.
 TOOLS_DIR="/data/.ironclaw/tools"
-if command -v ironclaw >/dev/null 2>&1; then
-    if [ -d "$TOOLS_DIR" ] && ls "$TOOLS_DIR"/*.wasm 1>/dev/null 2>&1; then
-        echo "Extensions already installed, skipping."
+MARKER="/data/.ironclaw/.install_marker"
+CURRENT_BINARY_SHA=""
+if command -v sha256sum >/dev/null 2>&1 && command -v ironclaw >/dev/null 2>&1; then
+    CURRENT_BINARY_SHA=$(sha256sum "$(command -v ironclaw)" | awk '{print $1}')
+fi
+PREVIOUS_BINARY_SHA=""
+[ -f "$MARKER" ] && PREVIOUS_BINARY_SHA=$(cat "$MARKER" 2>/dev/null || true)
+
+NEEDS_INSTALL=0
+if ! command -v ironclaw >/dev/null 2>&1; then
+    echo "ironclaw binary not found in PATH; skipping default extension install."
+elif [ ! -d "$TOOLS_DIR" ] || ! ls "$TOOLS_DIR"/*.wasm 1>/dev/null 2>&1; then
+    NEEDS_INSTALL=1
+elif [ -n "$CURRENT_BINARY_SHA" ] && [ "$CURRENT_BINARY_SHA" != "$PREVIOUS_BINARY_SHA" ]; then
+    echo "ironclaw binary changed; reinstalling default extensions..."
+    NEEDS_INSTALL=1
+else
+    echo "Extensions already installed for current ironclaw binary, skipping."
+fi
+
+if [ "$NEEDS_INSTALL" -eq 1 ]; then
+    echo "Installing default extensions..."
+    if ironclaw registry install-defaults --force 2>&1; then
+        [ -n "$CURRENT_BINARY_SHA" ] && echo "$CURRENT_BINARY_SHA" > "$MARKER"
     else
-        echo "Installing default extensions..."
-        if ! ironclaw registry install-defaults --force 2>&1; then
-            echo "Warning: Extension installation failed (non-fatal), continuing..."
-        fi
+        echo "Warning: Extension installation failed (non-fatal), continuing..."
     fi
 fi
 
